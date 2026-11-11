@@ -377,7 +377,11 @@ api.get('/apps/callback', async (c) => {
       }
     }
   }
-  return c.html(`<!doctype html><meta charset="utf-8"><title>Connected</title><body style="font-family:system-ui;padding:40px;text-align:center">${ok ? 'Connected. You can close this window.' : 'Connection failed.'}<script>try{window.opener&&window.opener.postMessage({type:'grokbot-connected',slug:${JSON.stringify(slug)},ok:${ok}},'*')}catch(e){};setTimeout(()=>window.close(),800)</script></body>`);
+  // slug comes straight from the query string and is echoed into an inline script: keep it to toolkit-slug characters
+  // and escape '<' so a value like "</script>" cannot close the script element. Only the app's own origin gets the message.
+  const message = JSON.stringify({ type: 'grokbot-connected', slug: /^[a-z0-9_-]{1,64}$/i.test(slug) ? slug : '', ok }).replace(/</g, '\\u003c');
+  const target = JSON.stringify(new URL(env.appUrl).origin).replace(/</g, '\\u003c');
+  return c.html(`<!doctype html><meta charset="utf-8"><title>Connected</title><body style="font-family:system-ui;padding:40px;text-align:center">${ok ? 'Connected. You can close this window.' : 'Connection failed.'}<script>try{window.opener&&window.opener.postMessage(${message},${target})}catch(e){};setTimeout(()=>window.close(),800)</script></body>`);
 });
 
 api.delete('/apps/:slug', async (c) => {
