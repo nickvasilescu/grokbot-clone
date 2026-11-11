@@ -31,7 +31,9 @@ export function userFromToken(t: string | undefined): User | null {
 
 export function userFromCookieHeader(cookieHeader: string | undefined): User | null {
   const m = cookieHeader?.split(/;\s*/).find((p) => p.startsWith(`${COOKIE}=`));
-  return userFromToken(m ? decodeURIComponent(m.slice(COOKIE.length + 1)) : undefined);
+  let t: string | undefined;
+  try { t = m ? decodeURIComponent(m.slice(COOKIE.length + 1)) : undefined; } catch { return null; } // e.g. a lone '%'
+  return userFromToken(t);
 }
 
 export const requireUser: MiddlewareHandler<AuthVars> = async (c, next) => {

@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server } from 'node:http';
+import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import { db } from './db.js';
 import { userFromCookieHeader } from './lib/auth.js';
@@ -122,6 +123,15 @@ export function attachVncRelay(server: Server) {
   const wss = new WebSocketServer({ noServer: true, handleProtocols: (protocols) => (protocols.has('binary') ? 'binary' : false) });
 
   server.on('upgrade', (req: IncomingMessage, socket, head) => {
+    // Node calls 'upgrade' listeners without a try/catch, so anything thrown here (a request target such as '//' that
+    // URL cannot parse, a malformed cookie) is an uncaught exception that stops the whole server.
+    try { handleUpgrade(req, socket, head); } catch (e: any) {
+      console.warn('[vnc] bad upgrade request', e?.message ?? e);
+      socket.destroy();
+    }
+  });
+
+  function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
     const url = new URL(req.url ?? '/', 'http://x');
     const m = url.pathname.match(/^\/api\/bots\/([^/]+)\/screen$/);
     if (!m) return; // not ours
@@ -134,7 +144,7 @@ export function attachVncRelay(server: Server) {
     }
     const mode = url.searchParams.get('mode') === 'control' ? 'control' : 'watch';
     wss.handleUpgrade(req, socket, head, (client) => relay(client, user.id, bot.id, mode));
-  });
+  }
 }
 
 async function relay(client: WebSocket, userId: string, botId: string, mode: 'watch' | 'control') {
@@ -153,6 +163,8 @@ async function relay(client: WebSocket, userId: string, botId: string, mode: 'wa
     const fwd = mode === 'watch' ? filter.feed(Buffer.from(data)) : Buffer.from(data);
     if (fwd.length && upstream?.readyState === WebSocket.OPEN) upstream.send(fwd);
   });
+  // ws emits 'error' for protocol violations (e.g. an unmasked frame); without a listener that error is thrown.
+  client.on('error', (e) => { console.warn('[vnc] client error', e.message); closeAll(1002, 'protocol error'); });
   client.on('close', () => { viewerClosed(userId); fromClient.close(new Error('client closed')); try { upstream?.close(); } catch { /* */ } });
   viewerOpened(userId); // keeps the computer awake while someone is watching (see idle.ts)
 
