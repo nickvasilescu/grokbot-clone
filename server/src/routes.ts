@@ -213,7 +213,10 @@ api.post('/bots/:id/fresh', (c) => {
 });
 
 api.post('/approvals/:id', async (c) => {
-  const { decision } = await c.req.json<{ decision: 'allow' | 'always' | 'deny' }>();
+  const { decision } = await c.req.json<{ decision: 'allow' | 'always' | 'deny' }>().catch(() => ({ decision: undefined }));
+  // Anything that is not an explicit allow is treated as allow downstream, so an unknown or missing value must not
+  // silently approve a tool call the user never saw a decision for.
+  if (decision !== 'allow' && decision !== 'always' && decision !== 'deny') return c.json({ error: 'invalid decision' }, 400);
   try { resolveApproval(c.get('user').id, c.req.param('id'), decision); } catch { return c.json({ error: 'not found' }, 404); }
   return c.json({ ok: true });
 });
