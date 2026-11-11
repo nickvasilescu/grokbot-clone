@@ -107,7 +107,8 @@ export function listRows(botId: string, opts: { beforeSeq?: number; limit?: numb
   if (opts.afterRev !== undefined) {
     return (db.prepare('SELECT * FROM rows WHERE bot_id=? AND generation=? AND updated_seq>? ORDER BY seq ASC').all(botId, b.generation, opts.afterRev) as any[]).map(toRow);
   }
-  const limit = Math.min(opts.limit ?? 200, 500);
+  // Clamp to 1..500: a negative LIMIT means unlimited in SQLite, and NaN binds as NULL (also unlimited / error).
+  const limit = Math.min(Math.max(Math.trunc(Number(opts.limit ?? 200)) || 200, 1), 500);
   const rows = (opts.beforeSeq
     ? db.prepare('SELECT * FROM rows WHERE bot_id=? AND generation=? AND seq<? ORDER BY seq DESC LIMIT ?').all(botId, b.generation, opts.beforeSeq, limit)
     : db.prepare('SELECT * FROM rows WHERE bot_id=? AND generation=? ORDER BY seq DESC LIMIT ?').all(botId, b.generation, limit)) as any[];
