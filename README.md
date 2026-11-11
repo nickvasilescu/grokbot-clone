@@ -93,7 +93,7 @@ npm run build
 npm start
 ```
 
-The API serves the built app at **[localhost:8787](http://localhost:8787)**. Set both `APP_URL` and `SERVER_URL` to that address, or to your public HTTPS URL when hosting it, so sign-in redirects return to the right place. Disable `DEV_LOGIN` before exposing the server to other users.
+The API serves the built app at **[localhost:8787](http://localhost:8787)**. Set both `APP_URL` and `SERVER_URL` to that address, or to your public HTTPS URL when hosting it, so sign-in redirects return to the right place. The server listens on `127.0.0.1` by default; set `HOST=0.0.0.0` to reach it from other machines. Disable `DEV_LOGIN` before exposing the server to other users.
 
 ## How it works
 

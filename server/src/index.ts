@@ -38,7 +38,8 @@ if (fs.existsSync(webDist)) {
   app.get('*', (c) => c.html(fs.readFileSync(path.join(webDist, 'index.html'), 'utf8')));
 }
 
-const server = serve({ fetch: app.fetch, port: env.port }, (info) => console.log(`[grokbot] server on http://localhost:${info.port} (model ${env.xaiModel})`));
+const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (info) => console.log(`[grokbot] server on http://${env.host}:${info.port} (model ${env.xaiModel})`));
+if (env.devLogin && !['127.0.0.1', 'localhost', '::1'].includes(env.host)) console.warn(`[grokbot] DEV_LOGIN=1 while listening on ${env.host}: anyone who can reach this port can sign in as any email. Set DEV_LOGIN=0 before exposing the server.`);
 attachVncRelay(server as unknown as Server);
 // GROKBOT_NO_SCHEDULER=1 for extra dev/test servers sharing a database copy, so routines and triggers don't fire twice.
 if (process.env.GROKBOT_NO_SCHEDULER !== '1') {

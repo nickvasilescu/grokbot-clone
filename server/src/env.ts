@@ -6,6 +6,8 @@ function req(name: string): string {
 
 export const env = {
   port: Number(process.env.PORT ?? 8787),
+  /** Interface to listen on. Loopback by default; set HOST=0.0.0.0 to accept connections from other machines. */
+  host: process.env.HOST || '127.0.0.1',
   appUrl: process.env.APP_URL ?? 'http://localhost:5173',
   /** Public URL of this server, used for OAuth callbacks. */
   serverUrl: process.env.SERVER_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
