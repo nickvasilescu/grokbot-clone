@@ -132,11 +132,12 @@ export async function startGoogleLogin(provisionalUserId: string, callbackUrl: s
   return { redirectUrl: req.redirectUrl as string, connectedAccountId: req.id as string | undefined };
 }
 
-export async function googleProfile(connectedAccountId: string): Promise<{ email: string; name?: string }> {
+export async function googleProfile(connectedAccountId: string, userId: string): Promise<{ email: string; name?: string }> {
   const r: any = await composio.tools.proxyExecute({
     endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me/profile',
     method: 'GET',
     connectedAccountId,
+    userId,
   } as any);
   const data = r?.data ?? r;
   const email = data?.emailAddress ?? data?.email;
