@@ -389,12 +389,12 @@ api.get('/apps/callback', async (c) => {
     const connected = await connectedToolkits(userId).catch(() => new Set<string>());
     if (connected.has(slug)) {
       hub.emit(userId, { type: 'connections' });
-      if (botId && ownBot(userId, botId)) {
+      // Resume the Bot only for the pending connect card that started this flow, so a replayed or
+      // forged callback URL can't start extra (paid) turns.
+      const row = botId && seq && ownBot(userId, botId) ? getRow(botId, seq) : null;
+      if (botId && row?.body.type === 'card' && row.body.card === 'connect' && row.body.status === 'pending' && row.body.toolkit === slug) {
         const info = await toolkitInfo(slug);
-        if (seq) {
-          const row = getRow(botId, seq);
-          if (row?.body.type === 'card' && row.body.card === 'connect') updateRow(botId, seq, { ...row.body, status: 'connected' });
-        }
+        updateRow(botId, row.seq, { ...row.body, status: 'connected' });
         enqueue(botId, { type: 'system', text: `The user connected ${info?.name ?? slug}. Continue with what you were doing.` });
       }
     }
