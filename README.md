@@ -122,7 +122,6 @@ The main source directories are:
 ```text
 server/src/     API routes, agent runtime, tools, and integrations
 web/src/        Chat, Bot settings, app connections, computer viewer, and voice
-web/artwork/    Original design assets used to generate Bot avatars
 web/public/     Static UI assets
 tests/          Playwright integration and voice scripts
 docs/           Architecture and integration guides
