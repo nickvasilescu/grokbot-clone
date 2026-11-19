@@ -13,6 +13,16 @@ import { createRoom, postToRoom } from './rooms.js';
 import type { ActivityKind } from '../types.js';
 import { Cron } from 'croner';
 
+/** Validate a cron schedule and reject anything that would run more often than once a minute.
+ *  croner accepts a 6-field (per-second) pattern, which would run a model turn up to 86,400 times a day. */
+const MIN_ROUTINE_INTERVAL_MS = 60_000;
+function assertCronInterval(schedule: string, timezone: string): void {
+  const c = new Cron(schedule, { paused: true, timezone }); // throws on a syntactically invalid pattern
+  const a = c.nextRun();
+  const b = a ? c.nextRun(a) : null;
+  if (a && b && b.getTime() - a.getTime() < MIN_ROUTINE_INTERVAL_MS) throw new Error('schedule may run at most once per minute');
+}
+
 export interface ToolCtx {
   userId: string;
   botId: string;
@@ -217,7 +227,7 @@ export const TOOLS: ToolDef[] = [
     activity: 'working',
     label: 'Setting up a routine',
     impl: async (a, ctx) => {
-      try { new Cron(a.schedule, { paused: true, timezone: a.timezone || 'UTC' }); } catch (e: any) { return { output: `Invalid schedule: ${e.message}` }; }
+      try { assertCronInterval(a.schedule, a.timezone || 'UTC'); } catch (e: any) { return { output: `Invalid schedule: ${e.message}` }; }
       const id = newId('rt');
       db.prepare('INSERT INTO routines(id,bot_id,name,prompt,schedule,timezone,enabled,created_at) VALUES (?,?,?,?,?,?,1,?)').run(id, ctx.botId, a.name, a.prompt, a.schedule, a.timezone || 'UTC', now());
       const r = toRoutine(db.prepare('SELECT * FROM routines WHERE id=?').get(id));
@@ -295,7 +305,7 @@ export const TOOLS: ToolDef[] = [
       const cur = db.prepare('SELECT * FROM routines WHERE id=? AND bot_id=?').get(a.routine_id, ctx.botId) as any;
       if (!cur) return { output: 'No such routine.' };
       const next = { ...cur, name: a.name ?? cur.name, prompt: a.prompt ?? cur.prompt, schedule: a.schedule ?? cur.schedule, timezone: a.timezone ?? cur.timezone, enabled: a.enabled === undefined ? cur.enabled : a.enabled ? 1 : 0 };
-      try { new Cron(next.schedule, { paused: true, timezone: next.timezone }); } catch (e: any) { return { output: `Invalid schedule: ${e.message}` }; }
+      try { assertCronInterval(next.schedule, next.timezone); } catch (e: any) { return { output: `Invalid schedule: ${e.message}` }; }
       db.prepare('UPDATE routines SET name=?,prompt=?,schedule=?,timezone=?,enabled=? WHERE id=?').run(next.name, next.prompt, next.schedule, next.timezone, next.enabled, cur.id);
       const r = toRoutine(db.prepare('SELECT * FROM routines WHERE id=?').get(cur.id));
       r.enabled ? scheduleRoutine(r) : unscheduleRoutine(r.id);
