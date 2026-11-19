@@ -122,7 +122,9 @@ export function innerToolSlugs(name: string, args: any): string[] {
 }
 
 const READ_RE = /_(GET|LIST|SEARCH|FETCH|FIND|READ|RETRIEVE|QUERY|LOOKUP|CHECK|DESCRIBE|VIEW|COUNT)(_|$)/;
-export const isReadOnlySlug = (slug: string) => READ_RE.test(slug.toUpperCase());
+// A read word alone isn't enough: e.g. GITHUB_CREATE_CHECK_RUN contains CHECK but writes.
+const WRITE_RE = /_(CREATE|UPDATE|DELETE|REMOVE|SEND|POST|PUT|PATCH|ADD|INSERT|MOVE|COPY|UPLOAD|SET|EDIT|MODIFY|REPLY|FORWARD|INVITE|SHARE|ARCHIVE|TRASH|ENABLE|DISABLE|RUN|EXECUTE|START|STOP|CANCEL|APPROVE|MERGE|CLOSE|PUBLISH|ASSIGN|TRANSFER|PAY|REFUND|MARK)(_|$)/;
+export const isReadOnlySlug = (slug: string) => READ_RE.test(slug.toUpperCase()) && !WRITE_RE.test(slug.toUpperCase());
 
 // ---------- sign-in via Composio-managed Google (Gmail) connection ----------
 

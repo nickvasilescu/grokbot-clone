@@ -475,10 +475,14 @@ export function functionSchemas() {
 
 export type Decision = 'allow' | 'ask' | 'block';
 
+/** Composio meta tools that only discover tools. Others (remote workbench/bash, proxy calls) can run any action. */
+const DISCOVERY_META_TOOLS = new Set(['COMPOSIO_SEARCH_TOOLS', 'COMPOSIO_GET_TOOL_SCHEMAS']);
+
 export function policyFor(userId: string, toolName: string, args: any): { decision: Decision; key: string; toolkit?: string; title: string } {
-  if (toolMap.has(toolName)) return { decision: 'allow', key: toolName, title: toolName };
-  const slugs = innerToolSlugs(toolName, args);
-  if (!slugs.length) return { decision: 'allow', key: toolName, title: toolName };
+  if (toolMap.has(toolName) || DISCOVERY_META_TOOLS.has(toolName)) return { decision: 'allow', key: toolName, title: toolName };
+  let slugs = innerToolSlugs(toolName, args);
+  // Fail closed: a meta tool we can't see inside (or a batch we can't parse) is gated under its own name.
+  if (!slugs.length) slugs = [toolName];
   let decision: Decision = 'allow';
   let key = slugs[0];
   for (const slug of slugs) {
