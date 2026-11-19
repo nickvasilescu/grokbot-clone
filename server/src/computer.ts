@@ -16,8 +16,11 @@ const inflight = new Map<string, Promise<string>>();
 
 /** Per-bot Chrome profiles and Library files live under this directory on the box. */
 export const BOX_ROOT = '/root/teammates';
-/** Matches a bot's Chrome processes whichever box root they were started under. */
-export const chromeProfilePattern = (botId: string) => `user-data-dir=.*/profiles/${botId}`;
+/**
+ * pgrep/pkill pattern for a bot's Chrome processes, whichever box root they were started under.
+ * "profile[s]" keeps the pattern from matching the shell command that contains it.
+ */
+export const chromeProfilePattern = (botId: string) => `user-data-dir=.*/profile[s]/${botId}`;
 
 const linkedBoxes = new Set<string>();
 /**
