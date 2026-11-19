@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { db, now } from './db.js';
 import { env } from './env.js';
 import { newId } from './lib/ids.js';
@@ -59,20 +60,34 @@ api.get('/auth/me', (c) => {
   return c.json({ user, devLogin: env.devLogin });
 });
 
+// Sign-in attempts are bound to the browser that started them (a short-lived cookie), so a callback URL
+// can't be replayed in someone else's browser, and they expire after LOGIN_TTL_MS.
+const LOGIN_COOKIE = 'login_attempt';
+const LOGIN_TTL_MS = 15 * 60_000;
+
 api.get('/auth/google/start', async (c) => {
+  db.prepare('DELETE FROM login_attempts WHERE created_at < ?').run(now() - LOGIN_TTL_MS);
   const attemptId = newId('login');
   const provisional = newId('usr');
   const cb = `${env.serverUrl}/api/auth/google/callback?attempt=${attemptId}`;
   const { redirectUrl, connectedAccountId } = await startGoogleLogin(provisional, cb);
-  db.prepare('INSERT INTO login_attempts(id,provisional_user_id,connected_account_id,created_at) VALUES (?,?,?,?)').run(attemptId, provisional, connectedAccountId ?? null, now());
+  if (!connectedAccountId) return c.redirect(`${env.appUrl}/?login=failed`);
+  db.prepare('INSERT INTO login_attempts(id,provisional_user_id,connected_account_id,created_at) VALUES (?,?,?,?)').run(attemptId, provisional, connectedAccountId, now());
+  setCookie(c, LOGIN_COOKIE, attemptId, { httpOnly: true, secure: env.secureCookies, sameSite: 'Lax', path: '/api/auth/google', maxAge: LOGIN_TTL_MS / 1000 });
   return c.redirect(redirectUrl);
 });
 
 api.get('/auth/google/callback', async (c) => {
-  const attempt = db.prepare('SELECT * FROM login_attempts WHERE id=?').get(c.req.query('attempt') ?? '') as any;
-  const caId = c.req.query('connected_account_id') ?? attempt?.connected_account_id;
-  if (!attempt || c.req.query('status') === 'failed' || !caId) return c.redirect(`${env.appUrl}/?login=failed`);
-  if (attempt.connected_account_id && caId !== attempt.connected_account_id) return c.redirect(`${env.appUrl}/?login=failed`);
+  const attemptId = c.req.query('attempt') ?? '';
+  const boundTo = getCookie(c, LOGIN_COOKIE);
+  deleteCookie(c, LOGIN_COOKIE, { path: '/api/auth/google' });
+  const attempt = boundTo === attemptId ? (db.prepare('SELECT * FROM login_attempts WHERE id=?').get(attemptId) as any) : null;
+  // Only trust the connected account recorded when this attempt started, never one from the query string.
+  const caId: string | undefined = attempt?.connected_account_id ?? undefined;
+  const fresh = attempt && now() - attempt.created_at < LOGIN_TTL_MS;
+  if (!attempt || !fresh || c.req.query('status') === 'failed' || !caId) return c.redirect(`${env.appUrl}/?login=failed`);
+  const returned = c.req.query('connected_account_id');
+  if (returned && returned !== caId) return c.redirect(`${env.appUrl}/?login=failed`);
   db.prepare('DELETE FROM login_attempts WHERE id=?').run(attempt.id);
   try {
     const profile = await googleProfile(caId);
