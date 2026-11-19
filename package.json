@@ -1,7 +1,7 @@
 {
   "name": "grokbot",
   "private": true,
-  "description": "Grokbot: internal reverse-engineering clone of xAI Grok Bot. Internal research use only; do not distribute.",
+  "description": "grokbot-clone: an open-source take on always-on AI teammates, built on public APIs (xAI, Orgo, Composio). Not affiliated with xAI.",
   "workspaces": ["server", "web"],
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web",
