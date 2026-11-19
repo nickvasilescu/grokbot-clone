@@ -27,6 +27,11 @@ function hashPick<T>(id: string, list: T[]): T {
   return list[h % list.length];
 }
 
+/** JSON that is safe to embed inside an inline <script>: `<` can't close the tag and line separators can't break the statement. */
+export function jsonForScript(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+}
+
 function createBot(userId: string, b: { name: string; label?: string; description?: string; instructions?: string; avatarShape?: string; avatarColor?: string; mode?: string; isPrimary?: boolean }) {
   const id = newId('bot');
   const shape = SHAPES.includes(b.avatarShape as AvatarShape) ? b.avatarShape : hashPick(id, SHAPES.slice(0, 13));
@@ -359,6 +364,8 @@ api.post('/apps/:slug/connect', async (c) => {
 api.get('/apps/callback', async (c) => {
   const userId = userFromCookieHeader(c.req.header('cookie'))?.id ?? '';
   const slug = c.req.query('slug') ?? '';
+  // This route is unauthenticated and reflects `slug` into the page, so accept only toolkit-slug shapes.
+  if (!/^[a-z0-9_-]{1,64}$/i.test(slug)) return c.text('Invalid app.', 400);
   const botId = c.req.query('bot');
   const seq = Number(c.req.query('seq') ?? 0);
   const ok = c.req.query('status') !== 'failed';
@@ -377,7 +384,12 @@ api.get('/apps/callback', async (c) => {
       }
     }
   }
-  return c.html(`<!doctype html><meta charset="utf-8"><title>Connected</title><body style="font-family:system-ui;padding:40px;text-align:center">${ok ? 'Connected. You can close this window.' : 'Connection failed.'}<script>try{window.opener&&window.opener.postMessage({type:'grokbot-connected',slug:${JSON.stringify(slug)},ok:${ok}},'*')}catch(e){};setTimeout(()=>window.close(),800)</script></body>`);
+  // Data embedded in an inline <script> must not be able to close the tag, so escape `<` (and U+2028/2029).
+  const payload = jsonForScript({ type: 'grokbot-connected', slug, ok });
+  const target = jsonForScript(new URL(env.appUrl).origin);
+  c.header('Cache-Control', 'no-store');
+  c.header('X-Content-Type-Options', 'nosniff');
+  return c.html(`<!doctype html><meta charset="utf-8"><title>Connected</title><body style="font-family:system-ui;padding:40px;text-align:center">${ok ? 'Connected. You can close this window.' : 'Connection failed.'}<script>try{window.opener&&window.opener.postMessage(${payload},${target})}catch(e){};setTimeout(()=>window.close(),800)</script></body>`);
 });
 
 api.delete('/apps/:slug', async (c) => {
