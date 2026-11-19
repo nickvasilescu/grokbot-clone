@@ -230,7 +230,7 @@ Citations come back automatically: as `source` parts in the AI SDK, and in annot
 
 ### A.5 Computer use
 
-**Finding:** the xAI API docs have **no native computer-use tool, action schema or computer-use model**. Searching the full `llms-full.txt` turns up "computer use" only in the Grok Bot product docs. The tools list in A.4 is complete. Grok Bot itself is "a computer-use agent" running on a hosted computer [D] https://docs.x.ai/grok-bot/how-grok-bot-works.md. The public API has no dedicated computer-use tool type.
+**Finding:** the xAI API docs have **no native computer-use tool, action schema or computer-use model**. Searching the full `llms-full.txt` turns up "computer use" only in the docs for xAI's own hosted agent product [D] https://docs.x.ai/grok-bot/how-grok-bot-works.md, not in the API reference. The tools list in A.4 is complete. The public API has no dedicated computer-use tool type.
 
 **Recommended pattern [R][I]:** use function tools for actions and send screenshots back as image input.
 
@@ -330,7 +330,7 @@ const { value } = await (await fetch('/api/voice/secret', { method: 'POST' })).j
 const ws = new WebSocket('wss://api.x.ai/v1/realtime?model=grok-voice-latest', [`xai-client-secret.${value}`]);
 ws.onopen = () => ws.send(JSON.stringify({ type: 'session.update', session: {
   voice: 'eve', instructions: 'You are Ada…', turn_detection: { type: 'server_vad' },
-  tools: [{ type: 'function', name: 'send_task', description: 'Hand work to the bot’s agent loop',
+  tools: [{ type: 'function', name: 'hand_off_task', description: 'Hand work to the bot’s agent loop',
             parameters: { type: 'object', properties: { task: { type: 'string' } }, required: ['task'] } }],
 }}));
 ```
@@ -350,7 +350,7 @@ ws.onopen = () => ws.send(JSON.stringify({ type: 'session.update', session: {
 2. **Effort policy:** `low` for computer-use step loops and routine tool calls, `medium` for chat, `high` for planning or "deep work" routines. Expose `xhigh` as an advanced bot setting.
 3. **Tools per turn:** our own functions (Orgo computer actions, shell, memory, `send_to_user`, `request_approval`, `send_to_bot`) plus the Composio tools from B.5. Add server-side `web_search` and `x_search` (cheap, citations included). Avoid xAI remote `mcp` for user apps, because xAI cannot apply our approvals (see B.5).
 4. **Computer use:** follow the A.5 pattern on the user's Orgo VM, one screen per bot.
-5. **Voice:** a browser or mobile client gets a 5-minute secret from our server and connects to `grok-voice-latest`. The voice agent gets a small relay toolset (`send_task`, `recall_messages`, `switch_bot`, `end_call`) that hands work to the text agent loop, the same split Grok Bot uses.
+5. **Voice:** a browser or mobile client gets a 5-minute secret from our server and connects to `grok-voice-latest`. The voice agent gets a small relay toolset (`hand_off_task`, `read_recent_chat`, `search_chat_history`, `check_progress`, `hang_up`) that hands work to the text agent loop.
 6. **Background routines:** use the Batch API (20% off) only for non-interactive digest jobs. Everything else goes through the normal or WebSocket path.
 
 ---

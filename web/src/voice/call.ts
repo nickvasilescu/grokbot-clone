@@ -1,6 +1,6 @@
-// The in-browser voice agent. Grok Bot runs calls as a second, lightweight agent against the xAI realtime
-// API that speaks as the bot and relays real work to the bot's main text agent (send_task). Results come
-// back through the normal transcript stream and are injected into the call as [work_landed] notes.
+// The in-browser voice agent. Calls run as a second, lightweight agent against the xAI realtime
+// API that speaks as the bot and relays real work to the bot's main text agent (hand_off_task). Results come
+// back through the normal transcript stream and are injected into the call as [task_result] notes.
 import { create } from 'zustand';
 import type { Row } from '@shared/types';
 import { sortedRows, useStore } from '../store';
@@ -22,7 +22,7 @@ interface VoiceState {
   listening: boolean;
   /** A response is being generated but no audio yet. */
   thinking: boolean;
-  /** send_task requests still running in the text agent. */
+  /** hand_off_task requests still running in the text agent. */
   working: { seq: number; request: string }[];
   captions: Caption[];
   error: string | null;
@@ -274,22 +274,22 @@ class VoiceCall {
     let args: Json = {};
     try { args = rawArgs ? JSON.parse(rawArgs) : {}; } catch { /* model sent bad JSON */ }
     let promise: Promise<string>;
-    if (name === 'end_the_call') promise = Promise.resolve('Ending the call.');
+    if (name === 'hang_up') promise = Promise.resolve('Ending the call.');
     else {
       // Show "working" right away; replaced by the real task once the server answers.
       const placeholder = { seq: -1, request: String(args.request ?? '') };
       const dropOptimistic = () => setV({ working: useVoice.getState().working.filter((x) => x !== placeholder) });
-      if (name === 'send_task') setV({ working: [...useVoice.getState().working, placeholder] });
+      if (name === 'hand_off_task') setV({ working: [...useVoice.getState().working, placeholder] });
       promise = voiceApi.tool(this.botId, this.sess!.callId, name, args)
         .then((r) => {
-          if (name === 'send_task') {
+          if (name === 'hand_off_task') {
             dropOptimistic();
             if (r.taskSeq) this.addTask(r.taskSeq, String(args.request ?? ''));
           }
           return r.output;
         })
         .catch((e) => {
-          if (name === 'send_task') dropOptimistic();
+          if (name === 'hand_off_task') dropOptimistic();
           return `Tool error: ${(e as Error).message}. Tell the user it didn't go through.`;
         });
     }
@@ -303,20 +303,20 @@ class VoiceCall {
     if (this.ended) return;
     // Every output first, then a single response.create (xAI parallel-call rule).
     batch.forEach(([callId], i) => this.send({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: outputs[i] } }));
-    if (batch.some(([, b]) => b.name === 'end_the_call')) {
+    if (batch.some(([, b]) => b.name === 'hang_up')) {
       await this.player.whenIdle(8000);
       this.end();
       return;
     }
     // A hand-off the bot already announced needs no follow-up turn; read tools do.
-    const needsReply = !spoke || batch.some(([, b]) => b.name !== 'send_task');
+    const needsReply = !spoke || batch.some(([, b]) => b.name !== 'hand_off_task');
     if (needsReply) {
       await this.player.whenIdle(8000); // don't talk over the current sentence
       if (!this.ended && !this.responseActive && !this.inflight.size) this.send({ type: 'response.create' });
     } else this.flushNotes();
   }
 
-  // ---------- work_landed: watch the text agent finish what was asked by voice ----------
+  // ---------- task_result: watch the text agent finish what was asked by voice ----------
 
   private addTask(seq: number, request: string) {
     const live = useStore.getState().live[this.botId];
@@ -397,7 +397,7 @@ class VoiceCall {
       }
       return;
     }
-    const text = this.notes.splice(0).map((n) => `[work_landed] ${n}`).join('\n\n');
+    const text = this.notes.splice(0).map((n) => `[task_result] ${n}`).join('\n\n');
     // A user-role item: the voice model ignores system-role items mid-call (tested), but relays these.
     this.send({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `${text}\n\n(Automatic note from your text agent, not spoken by ${this.firstName()}. Tell them the outcome now, briefly.)` }] } });
     this.send({ type: 'response.create' });

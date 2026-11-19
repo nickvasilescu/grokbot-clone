@@ -48,7 +48,7 @@ function findOrCreateUser(email: string, name?: string, preferId?: string) {
   if (existing) return { id: existing.id as string, isNew: false };
   const id = preferId ?? newId('usr');
   db.prepare('INSERT INTO users(id,email,name,created_at) VALUES (?,?,?,?)').run(id, email, name ?? email.split('@')[0], now());
-  createBot(id, { name: 'Quinn', label: 'Chief of Staff', description: 'Your main point of contact. Checks in proactively and coordinates work with your other Bots.', avatarShape: 'blob', avatarColor: 'black', isPrimary: true });
+  createBot(id, { name: 'Quinn', label: 'Chief of Staff', description: 'Your first stop for anything. Sends a short update at the times you pick and hands work to your other Bots.', avatarShape: 'blob', avatarColor: 'black', isPrimary: true });
   return { id, isNew: true };
 }
 
