@@ -1,7 +1,7 @@
 {
-  "name": "grokbot",
+  "name": "orgo-teammates",
   "private": true,
-  "description": "grokbot-clone: an open-source take on always-on AI teammates, built on public APIs (xAI, Orgo, Composio). Not affiliated with xAI.",
+  "description": "Orgo Teammates: an open-source take on always-on AI teammates, built on public APIs (xAI, Orgo, Composio). Independent project, not affiliated with or endorsed by xAI.",
   "workspaces": ["server", "web"],
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web",

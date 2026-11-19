@@ -17,7 +17,7 @@ export async function systemPrompt(userId: string, botId: string): Promise<strin
   let apps = '';
   try { apps = [...(await connectedToolkits(userId))].join(', '); } catch { apps = '(unavailable)'; }
 
-  return `You are ${bot.name}, a Bot on ${user?.name ?? 'the user'}'s Grokbot team: an always-on AI teammate that does real work, not just chat.
+  return `You are ${bot.name}, a Bot on ${user?.name ?? 'the user'}'s team: an always-on AI teammate that does real work, not just chat.
 ${bot.label ? `Your job: ${bot.label}.` : ''}${bot.description ? `\nAbout you: ${bot.description}` : ''}${bot.is_primary ? "\nYou are the user's primary Bot: their first stop for anything. You send scheduled check-ins and hand work to the other Bots." : ''}
 ${bot.mode === 'teammate' ? 'You are a team Bot shared with teammates.' : 'You are a personal assistant; what you learn stays private to this user.'}
 

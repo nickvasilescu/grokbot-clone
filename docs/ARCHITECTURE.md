@@ -1,6 +1,6 @@
 # Architecture
 
-grokbot-clone is a web app (`web/`) plus a Node server (`server/`) that runs every Bot's agent loop. The model is Grok 4.7 through the xAI Responses API. Each user's Bots act on one Orgo cloud computer and use apps connected through Composio.
+Orgo Teammates is a web app (`web/`) plus a Node server (`server/`) that runs every Bot's agent loop. The model is Grok 4.7 through the xAI Responses API. Each user's Bots act on one Orgo cloud computer and use apps connected through Composio.
 
 ## Components
 
@@ -38,7 +38,8 @@ Row kinds:
 
 The loop checks policy before executing each tool call:
 - A Bot's own computer and shell run freely.
-- Composio tools whose slug reads as read-only (`*_GET`, `*_LIST`, `*_SEARCH`, …) run automatically.
+- Composio tools whose slug reads as read-only (`*_GET`, `*_LIST`, `*_SEARCH`, …) and contains no write verb run automatically, as do the discovery meta tools (`COMPOSIO_SEARCH_TOOLS`, `COMPOSIO_GET_TOOL_SCHEMAS`).
+- Other Composio meta tools (for example the remote workbench, which can run any action) and batches whose inner tools can't be read need approval.
 - Anything else posts an **approval card** and pauses the turn, saving the pending calls in `pending_turns`. The turn resumes when the user answers.
   - **Allow** runs the call once.
   - **Always allow** stores a per-tool policy.
@@ -53,7 +54,7 @@ The loop checks policy before executing each tool call:
 
 ## Data
 
-SQLite (`data/grokbot.db`, WAL) holds:
+SQLite (`data/teammates.db`, WAL; installs from before the rename keep using `data/grokbot.db`) holds:
 - users and sessions
 - Bots, rows, model history
 - approvals, policies
@@ -62,6 +63,25 @@ SQLite (`data/grokbot.db`, WAL) holds:
 - Composio session ids, compactions, check-in settings
 
 Secrets live only in `.env` on the server.
+
+## Configuration
+
+Connection settings are in [`.env.example`](../.env.example). Tuning knobs, all optional:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `TEAMMATES_IDLE_SUSPEND_MIN` | `20` | Minutes with no running turn and no open viewer before the user's computer is suspended |
+| `TEAMMATES_IDLE_SWEEP_SEC` | `60` | How often the idle check runs |
+| `TEAMMATES_IDLE_DRY_RUN` | unset | `1` logs suspend decisions without suspending |
+| `TEAMMATES_COMPACT_TOKENS` / `TEAMMATES_COMPACT_CHARS` | `300000` chars | History size that triggers compaction |
+| `TEAMMATES_COMPACT_KEEP_TURNS` | `4` | Recent user turns kept verbatim after compaction |
+| `TEAMMATES_COMPACT_METHOD` | `auto` | `summary` skips xAI's compaction endpoint |
+| `TEAMMATES_CONSOLIDATE_IDLE_MIN` / `TEAMMATES_CONSOLIDATE_SWEEP_SEC` | `10` / `60` | When idle chats are consolidated into memories |
+| `TEAMMATES_PROMPT_MEMORY_CHARS` | `4000` | Memory budget in the system prompt |
+| `TEAMMATES_NO_SCHEDULER` | unset | `1` disables routines, triggers and check-ins (for extra dev servers sharing a database) |
+| `TEAMMATES_API` | `http://localhost:8787` | API target for the Vite dev proxy |
+
+Each variable was called `GROKBOT_*` before the rename; the old names are still read as a fallback.
 
 ## External services
 

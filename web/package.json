@@ -1,5 +1,6 @@
 {
-  "name": "@grokbot/web",
+  "name": "@orgo-teammates/web",
+  "description": "Orgo Teammates web app",
   "private": true,
   "type": "module",
   "scripts": {

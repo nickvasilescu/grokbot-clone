@@ -63,12 +63,12 @@ export function openPopup(url: string) {
   const w = 520, h = 680;
   const left = window.screenX + (window.outerWidth - w) / 2;
   const top = window.screenY + (window.outerHeight - h) / 2;
-  connectPopup = window.open(url, 'grokbot-connect', `width=${w},height=${h},left=${left},top=${top}`);
+  connectPopup = window.open(url, 'teammates-connect', `width=${w},height=${h},left=${left},top=${top}`);
   return connectPopup;
 }
 
 /** True for the "app connected" message posted by our OAuth callback page (from our popup or our own origin). */
 export function isConnectedMessage(e: MessageEvent): boolean {
-  if ((e.data as { type?: string } | null)?.type !== 'grokbot-connected') return false;
+  if ((e.data as { type?: string } | null)?.type !== 'teammates-connected') return false;
   return e.origin === window.location.origin || (connectPopup !== null && e.source === connectPopup);
 }

@@ -14,6 +14,24 @@ import type { ComputerState } from './types.js';
 const MAX_SCREENS = 4;
 const inflight = new Map<string, Promise<string>>();
 
+/** Per-bot Chrome profiles and Library files live under this directory on the box. */
+export const BOX_ROOT = '/root/teammates';
+/** Matches a bot's Chrome processes whichever box root they were started under. */
+export const chromeProfilePattern = (botId: string) => `user-data-dir=.*/profiles/${botId}`;
+
+const linkedBoxes = new Set<string>();
+/**
+ * Boxes created before the rename keep their data in /root/grokbot. Point BOX_ROOT at it once per box
+ * (a symlink, so nothing moves and running Chrome profiles stay intact).
+ */
+export async function linkLegacyBoxRoot(computerId: string): Promise<void> {
+  if (linkedBoxes.has(computerId)) return;
+  try {
+    await orgo.bash(computerId, undefined, `if [ -d /root/grokbot ] && [ ! -e ${BOX_ROOT} ]; then ln -s /root/grokbot ${BOX_ROOT}; fi; echo ok`, 30);
+    linkedBoxes.add(computerId);
+  } catch { /* retried on the next call */ }
+}
+
 function rowFor(userId: string) {
   let r = db.prepare('SELECT * FROM computers WHERE user_id=?').get(userId) as any;
   if (!r) {
@@ -68,8 +86,8 @@ export function ensureComputer(userId: string): Promise<string> {
         await ensureWorkspace();
         setStatus(userId, 'creating');
         const user = db.prepare('SELECT email FROM users WHERE id=?').get(userId) as any;
-        const name = `grokbot-${(user?.email ?? userId).split('@')[0].replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 30)}-${userId.slice(-6)}`;
-        const c = await orgo.createComputer(name, `grokbot-box-${userId}`);
+        const name = `teammates-${(user?.email ?? userId).split('@')[0].replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 30)}-${userId.slice(-6)}`;
+        const c = await orgo.createComputer(name, `teammates-box-${userId}`);
         setStatus(userId, mapStatus(c.status), { orgoId: c.id });
         await prepareBox(c.id);
         setStatus(userId, 'running', { orgoId: c.id });
@@ -128,13 +146,14 @@ async function waitRunning(id: string, timeoutMs = 240_000) {
 /** First-boot setup: a profile dir for per-bot Chrome sessions. */
 async function prepareBox(id: string) {
   try {
-    await orgo.bash(id, undefined, 'mkdir -p /root/grokbot/profiles /root/grokbot/files && (which google-chrome || which chromium || which chromium-browser || which firefox) 2>/dev/null', 60);
+    await orgo.bash(id, undefined, `mkdir -p ${BOX_ROOT}/profiles ${BOX_ROOT}/files && (which google-chrome || which chromium || which chromium-browser || which firefox) 2>/dev/null`, 60);
   } catch { /* non-fatal */ }
 }
 
 /** Get (or lease) this bot's screen on the box. */
 export async function screenFor(userId: string, botId: string): Promise<{ computerId: string; screenId: string }> {
   const computerId = await ensureComputer(userId);
+  await linkLegacyBoxRoot(computerId);
   const mine = db.prepare('SELECT screen_id FROM screens WHERE bot_id=?').get(botId) as any;
   if (mine) {
     try {
@@ -162,7 +181,7 @@ export async function screenFor(userId: string, botId: string): Promise<{ comput
       const victim = leased.find((l) => !getLive(l.bot_id).isRunning && l.screen_id !== 'default') ?? leased.find((l) => l.screen_id !== 'default') ?? leased[0];
       db.prepare('DELETE FROM screens WHERE bot_id=?').run(victim.bot_id);
       screenId = victim.screen_id;
-      try { await orgo.bash(computerId, screenId!, `pkill -f "user-data-dir=/root/grokbot/profiles/${victim.bot_id}" || true`, 20); } catch { /* best effort */ }
+      try { await orgo.bash(computerId, screenId!, `pkill -f "${chromeProfilePattern(victim.bot_id)}" || true`, 20); } catch { /* best effort */ }
     }
   }
   db.prepare('INSERT OR REPLACE INTO screens(bot_id,user_id,screen_id,last_used_at) VALUES (?,?,?,?)').run(botId, userId, screenId, now());
@@ -177,12 +196,13 @@ async function prepareScreen(computerId: string, screenId: string) {
     const display = `:${screenId.replace('screen-', '')}`;
     // xfwm4's compositor paints over the root window, so run a desktop (wallpaper) on this display.
     // xfdesktop is single-instance per D-Bus session, hence a private session per screen.
-    const pid = `/tmp/grokbot-desktop-${display.slice(1)}.pid`;
+    const pid = `/tmp/teammates-desktop-${display.slice(1)}.pid`;
+    const legacyPid = `/tmp/grokbot-desktop-${display.slice(1)}.pid`; // desktops started before the rename
     await orgo.bash(
       computerId,
       screenId,
-      `export DISPLAY=${display}; if [ -f ${pid} ] && kill -0 $(cat ${pid}) 2>/dev/null; then echo running; else ` +
-        `(setsid nohup dbus-run-session -- xfdesktop --disable-wm-check >/tmp/grokbot-desktop-${display.slice(1)}.log 2>&1 < /dev/null & echo $! > ${pid}); sleep 2; echo started; fi`,
+      `export DISPLAY=${display}; if { [ -f ${pid} ] && kill -0 $(cat ${pid}); } 2>/dev/null || { [ -f ${legacyPid} ] && kill -0 $(cat ${legacyPid}); } 2>/dev/null; then echo running; else ` +
+        `(setsid nohup dbus-run-session -- xfdesktop --disable-wm-check >/tmp/teammates-desktop-${display.slice(1)}.log 2>&1 < /dev/null & echo $! > ${pid}); sleep 2; echo started; fi`,
       30,
     );
   } catch { /* cosmetic; ignore */ }

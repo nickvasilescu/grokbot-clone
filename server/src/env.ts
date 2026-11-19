@@ -1,3 +1,15 @@
+import fs from 'node:fs';
+
+/** Reads TEAMMATES_<name>, falling back to the pre-rename GROKBOT_<name> so existing .env files keep working. */
+export const appEnv = (name: string): string | undefined => process.env[`TEAMMATES_${name}`] ?? process.env[`GROKBOT_${name}`];
+
+/** Default database file. Installs from before the rename keep using data/grokbot.db until it is renamed. */
+function defaultDbPath(): string {
+  const current = new URL('../../data/teammates.db', import.meta.url).pathname;
+  const legacy = new URL('../../data/grokbot.db', import.meta.url).pathname;
+  return !fs.existsSync(current) && fs.existsSync(legacy) ? legacy : current;
+}
+
 function req(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env ${name}`);
@@ -47,5 +59,5 @@ export const env = {
   openSignup: isLoopbackUrl(serverUrl),
   /** Mark cookies Secure when the server is reached over HTTPS. */
   secureCookies: serverUrl.startsWith('https://'),
-  dbPath: process.env.DB_PATH ?? new URL('../../data/grokbot.db', import.meta.url).pathname,
+  dbPath: process.env.DB_PATH ?? defaultDbPath(),
 };

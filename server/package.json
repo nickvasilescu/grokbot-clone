@@ -1,5 +1,6 @@
 {
-  "name": "@grokbot/server",
+  "name": "@orgo-teammates/server",
+  "description": "Orgo Teammates API server and agent runtime",
   "private": true,
   "type": "module",
   "scripts": {

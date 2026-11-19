@@ -266,7 +266,7 @@ async function callModel(ctx: ToolCtx, tools: any[], signal: AbortSignal): Promi
     reasoning: { effort: bot.effort ?? 'medium' },
     store: false,
     include: ['reasoning.encrypted_content'],
-    prompt_cache_key: `grokbot:${botId}:${bot.generation}`,
+    prompt_cache_key: `teammates:${botId}:${bot.generation}`,
     safety_identifier: sha256(userId).slice(0, 32),
     stream: true,
   };

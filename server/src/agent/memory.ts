@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { db, now } from '../db.js';
 import '../db-config.js';
-import { env } from '../env.js';
+import { appEnv, env } from '../env.js';
 import { newId } from '../lib/ids.js';
 import { hub } from '../lib/hub.js';
 import { getBotRow, getLive } from '../store.js';
@@ -18,17 +18,17 @@ const xai = new OpenAI({ apiKey: env.xaiKey, baseURL: 'https://api.x.ai/v1', tim
 const num = (v: string | undefined, d: number) => (v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : d);
 
 export const memoryConfig = {
-  /** Compact when the history estimate passes this many characters (~4 chars/token). GROKBOT_COMPACT_TOKENS overrides. */
-  compactChars: process.env.GROKBOT_COMPACT_TOKENS ? num(process.env.GROKBOT_COMPACT_TOKENS, 75_000) * 4 : num(process.env.GROKBOT_COMPACT_CHARS, 300_000),
+  /** Compact when the history estimate passes this many characters (~4 chars/token). TEAMMATES_COMPACT_TOKENS overrides. */
+  compactChars: appEnv('COMPACT_TOKENS') ? num(appEnv('COMPACT_TOKENS'), 75_000) * 4 : num(appEnv('COMPACT_CHARS'), 300_000),
   /** User turns kept verbatim after a compaction. */
-  keepTurns: num(process.env.GROKBOT_COMPACT_KEEP_TURNS, 4),
+  keepTurns: num(appEnv('COMPACT_KEEP_TURNS'), 4),
   /** Minutes without a message before consolidation runs. */
-  consolidateIdleMin: num(process.env.GROKBOT_CONSOLIDATE_IDLE_MIN, 10),
-  consolidateSweepSec: num(process.env.GROKBOT_CONSOLIDATE_SWEEP_SEC, 60),
+  consolidateIdleMin: num(appEnv('CONSOLIDATE_IDLE_MIN'), 10),
+  consolidateSweepSec: num(appEnv('CONSOLIDATE_SWEEP_SEC'), 60),
   /** 'auto' tries xAI /responses/compact then falls back to a summary; 'summary' skips xAI compaction. */
-  compactMethod: process.env.GROKBOT_COMPACT_METHOD === 'summary' ? 'summary' : 'auto',
+  compactMethod: appEnv('COMPACT_METHOD') === 'summary' ? 'summary' : 'auto',
   /** Character budget for the memory section of the system prompt. */
-  promptMemoryChars: num(process.env.GROKBOT_PROMPT_MEMORY_CHARS, 4000),
+  promptMemoryChars: num(appEnv('PROMPT_MEMORY_CHARS'), 4000),
 };
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ export async function maybeCompact(botId: string, items: any[], opts: { force?: 
   let method = 'xai-compact';
   let replaced: any[];
   try {
-    if (memoryConfig.compactMethod === 'summary') throw new Error('xAI compaction disabled by GROKBOT_COMPACT_METHOD=summary');
+    if (memoryConfig.compactMethod === 'summary') throw new Error('xAI compaction disabled by TEAMMATES_COMPACT_METHOD=summary');
     replaced = await compactWithXai(old);
   } catch (e: any) {
     console.warn(`[memory] compact via /responses/compact failed for ${botId}: ${e?.message ?? e}; falling back to a summary`);

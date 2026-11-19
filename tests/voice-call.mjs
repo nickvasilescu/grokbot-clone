@@ -1,7 +1,7 @@
 // Two-way voice call test: headless Chrome with a fake mic playing tests/ask-weather.wav.
 // Usage: node tests/voice-call.mjs <outDir> <throwawayBotId>   (changes that bot's voice settings)
 import { createRequire } from 'node:module';
-const require = createRequire('/home/t3code/.t3/projects/grokbot-clone/package.json');
+const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const S = process.argv[2]; const BOT = process.argv[3]; const BASE = 'http://localhost:8787';
 const t0 = Date.now(); const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...a);
@@ -9,7 +9,7 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome'
   '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${S}/ask-fixed.wav`, '--autoplay-policy=no-user-gesture-required'] });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['microphone'] });
 await ctx.addInitScript((bot) => {
-  localStorage.setItem('grokbot.selectedBot', bot); localStorage.setItem('grokbot.detailsOpen', '1');
+  localStorage.setItem('teammates.selectedBot', bot); localStorage.setItem('teammates.detailsOpen', '1');
   window.__audio = { starts: 0, seconds: 0 };
   const orig = AudioBufferSourceNode.prototype.start;
   AudioBufferSourceNode.prototype.start = function (...a) { window.__audio.starts++; window.__audio.seconds += this.buffer?.duration ?? 0; return orig.apply(this, a); };

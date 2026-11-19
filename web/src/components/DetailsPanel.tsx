@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Bot, ComputerState, Routine } from '@shared/types';
 import { BotAvatarFor } from '../avatar/BotAvatar';
 import { api, openPopup } from '../lib/api';
+import { prefGet, prefSet } from '../lib/prefs';
 import { botVars } from '../lib/colors';
 import { displayName, useSelectedBot, useStore } from '../store';
 import { Icon } from './Icon';
@@ -119,7 +120,7 @@ export function DetailsPanel() {
   const routines = useStore((s) => (bot ? s.routines[bot.id] : undefined));
   const set = useStore((s) => s.set);
   const [tab, setTab] = useState<'activity' | 'tasks' | 'library'>('activity');
-  const [hideSuggested, setHideSuggested] = useState(() => { try { return localStorage.getItem('grokbot.hideSuggested') === '1'; } catch { return false; } });
+  const [hideSuggested, setHideSuggested] = useState(() => prefGet('hideSuggested') === '1');
   if (!bot) return null;
 
   const addSlack = async () => {
@@ -172,7 +173,7 @@ export function DetailsPanel() {
               <section>
                 <div className="section-label section-label--row">
                   <span>Suggested</span>
-                  <button type="button" className="link-btn link-btn--small" onClick={() => { setHideSuggested(true); try { localStorage.setItem('grokbot.hideSuggested', '1'); } catch { /* ignore */ } }}>Hide</button>
+                  <button type="button" className="link-btn link-btn--small" onClick={() => { setHideSuggested(true); prefSet('hideSuggested', '1'); }}>Hide</button>
                 </div>
                 <div className="panel-card">
                   <button type="button" className="panel-row panel-row--link" onClick={addSlack}>

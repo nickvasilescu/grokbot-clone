@@ -5,7 +5,7 @@ import { newId } from './lib/ids.js';
 import { hub } from './lib/hub.js';
 import { requireUser, type AuthVars } from './lib/auth.js';
 import { getBotRow, listRoutines, listTasks } from './store.js';
-import { computerState, ensureComputer } from './computer.js';
+import { BOX_ROOT, chromeProfilePattern, computerState, ensureComputer, linkLegacyBoxRoot } from './computer.js';
 import { orgo } from './orgo.js';
 import { runInBotQueue } from './agent/loop.js';
 import { consolidateBot, historySize, maybeCompact, memoryConfig } from './agent/memory.js';
@@ -127,9 +127,9 @@ configApi.post('/bots/:id/compact', async (c) => {
   return c.json({ itemsBefore: before, itemsAfter: after, compacted: after !== before });
 });
 
-// ---------- library: files under /root/grokbot/files/<botId> on the bot's computer ----------
+// ---------- library: files under BOX_ROOT/files/<botId> on the bot's computer ----------
 
-const LIB_ROOT = '/root/grokbot/files';
+const LIB_ROOT = `${BOX_ROOT}/files`;
 
 function safeRel(p: string | undefined): string | null {
   const rel = (p ?? '').replace(/^\/+|\/+$/g, '');
@@ -160,6 +160,7 @@ async function boxFor(userId: string, botId: string, wake: boolean): Promise<{ c
   let computerId: string | null = comp?.status === 'running' ? comp.orgo_id : null;
   if (!computerId && wake) computerId = await ensureComputer(userId);
   if (!computerId) return null;
+  await linkLegacyBoxRoot(computerId);
   // Use the bot's own screen when it has one; never lease (and evict) a screen just to list files.
   const scr = db.prepare('SELECT screen_id FROM screens WHERE bot_id=?').get(botId) as any;
   return { computerId, screenId: scr?.screen_id };
@@ -223,9 +224,10 @@ configApi.post('/bots/:id/screen/reset', async (c) => {
   if (!lease) return c.json({ ok: true, note: 'no screen yet' });
   const comp = db.prepare("SELECT orgo_id FROM computers WHERE user_id=? AND status='running'").get(user.id) as any;
   if (!comp?.orgo_id) return c.json({ error: 'Wake the computer first' }, 409);
-  const profile = `/root/grokbot/profiles/${b.id}`;
+  const profile = `${BOX_ROOT}/profiles/${b.id}`;
   try {
-    await orgo.bash(comp.orgo_id, undefined, `pkill -f ${shq(`user-data-dir=${profile}`)}; rm -f ${shq(profile)}/Singleton*; echo ok`, 30).catch(() => null);
+    await linkLegacyBoxRoot(comp.orgo_id);
+    await orgo.bash(comp.orgo_id, undefined, `pkill -f ${shq(chromeProfilePattern(b.id))}; rm -f ${shq(profile)}/Singleton*; echo ok`, 30).catch(() => null);
     if (lease.screen_id !== 'default') {
       await orgo.deleteScreen(comp.orgo_id, lease.screen_id).catch((e) => console.warn('[computer] delete screen', e?.message));
       db.prepare('DELETE FROM screens WHERE bot_id=?').run(b.id);

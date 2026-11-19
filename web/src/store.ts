@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { prefGet, prefSet } from './lib/prefs';
 import type { Bot, ComputerState, LiveState, Routine, Row, ServerEvent, User } from '@shared/types';
 import { api } from './lib/api';
 
@@ -38,11 +39,11 @@ interface State {
   set(p: Partial<State>): void;
 }
 
-const LS_SELECTED = 'grokbot.selectedBot';
-const LS_DETAILS = 'grokbot.detailsOpen';
-const LS_SIDEBAR = 'grokbot.sidebarCollapsed';
-const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
-const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
+const LS_SELECTED = 'selectedBot';
+const LS_DETAILS = 'detailsOpen';
+const LS_SIDEBAR = 'sidebarCollapsed';
+const lsGet = prefGet;
+const lsSet = prefSet;
 
 export const useStore = create<State>((set, get) => ({
   user: null,
@@ -165,7 +166,7 @@ export const useStore = create<State>((set, get) => ({
       case 'tasks':
       case 'memories':
         // Picked up by configStore.ts (Tasks view, Library/Tasks tabs, bot settings).
-        window.dispatchEvent(new CustomEvent('grokbot:event', { detail: ev }));
+        window.dispatchEvent(new CustomEvent('teammates:event', { detail: ev }));
         return;
       case 'connections':
         set((st) => ({ connectionsVersion: st.connectionsVersion + 1 }));
