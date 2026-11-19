@@ -111,13 +111,18 @@ export async function executeComposio(userId: string, name: string, args: Record
   return r as { data?: unknown; error?: unknown; resultType?: string; logId?: string };
 }
 
+const DISCOVERY_META_TOOLS = new Set(['COMPOSIO_SEARCH_TOOLS', 'COMPOSIO_GET_TOOL_SCHEMAS', 'COMPOSIO_WAIT_FOR_CONNECTIONS']);
+
 /** Which inner tool slugs a Composio meta-tool call would run (for approval checks). */
 export function innerToolSlugs(name: string, args: any): string[] {
   if (name === 'COMPOSIO_MULTI_EXECUTE_TOOL') {
     const list = args?.tools ?? args?.tool_calls ?? args?.actions ?? [];
     return (Array.isArray(list) ? list : []).map((t: any) => String(t.tool_slug ?? t.slug ?? t.name ?? t.tool ?? '')).filter(Boolean);
   }
-  if (name.startsWith('COMPOSIO_')) return [];
+  // Discovery meta tools only describe tools. Every other meta tool can act with the user's connections
+  // (COMPOSIO_REMOTE_WORKBENCH and COMPOSIO_REMOTE_BASH_TOOL run code that can call any tool, COMPOSIO_PROXY_EXECUTE
+  // sends raw API requests), so it is returned as its own slug and goes through the approval policy like a write action.
+  if (name.startsWith('COMPOSIO_')) return DISCOVERY_META_TOOLS.has(name) ? [] : [name];
   return [name];
 }
 
