@@ -44,9 +44,16 @@ function createBot(userId: string, b: { name: string; label?: string; descriptio
   return getBot(id)!;
 }
 
+function mayCreateAccount(email: string) {
+  const e = email.trim().toLowerCase();
+  if (!env.allowedEmails.length) return env.openSignup;
+  return env.allowedEmails.some((a) => (a.startsWith('@') ? e.endsWith(a) : e === a));
+}
+
 function findOrCreateUser(email: string, name?: string, preferId?: string) {
   const existing = db.prepare('SELECT * FROM users WHERE lower(email)=lower(?)').get(email) as any;
   if (existing) return { id: existing.id as string, isNew: false };
+  if (!mayCreateAccount(email)) return null;
   const id = preferId ?? newId('usr');
   db.prepare('INSERT INTO users(id,email,name,created_at) VALUES (?,?,?,?)').run(id, email, name ?? email.split('@')[0], now());
   createBot(id, { name: 'Quinn', label: 'Chief of Staff', description: 'Your first stop for anything. Sends a short update at the times you pick and hands work to your other Bots.', avatarShape: 'blob', avatarColor: 'black', isPrimary: true });
@@ -91,7 +98,13 @@ api.get('/auth/google/callback', async (c) => {
   db.prepare('DELETE FROM login_attempts WHERE id=?').run(attempt.id);
   try {
     const profile = await googleProfile(caId);
-    const { id, isNew } = findOrCreateUser(profile.email, profile.name, attempt.provisional_user_id);
+    const found = findOrCreateUser(profile.email, profile.name, attempt.provisional_user_id);
+    if (!found) {
+      console.warn('[auth] sign-up refused (not in ALLOWED_EMAILS)');
+      await deleteConnection(caId);
+      return c.redirect(`${env.appUrl}/?login=failed`);
+    }
+    const { id, isNew } = found;
     // Existing user: the Gmail connection made for sign-in belongs to a throwaway id; remove it.
     if (!isNew && id !== attempt.provisional_user_id) await deleteConnection(caId);
     createSession(c, id);
@@ -106,8 +119,9 @@ api.post('/auth/dev', async (c) => {
   if (!env.devLogin) return c.json({ error: 'disabled' }, 403);
   const { email, name } = await c.req.json<{ email: string; name?: string }>();
   if (!email?.includes('@')) return c.json({ error: 'email required' }, 400);
-  const { id } = findOrCreateUser(email, name);
-  createSession(c, id);
+  const found = findOrCreateUser(email, name);
+  if (!found) return c.json({ error: 'This email is not allowed to sign up (ALLOWED_EMAILS).' }, 403);
+  createSession(c, found.id);
   return c.json({ ok: true });
 });
 

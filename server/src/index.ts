@@ -42,6 +42,7 @@ if (fs.existsSync(webDist)) {
 }
 
 const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (info) => console.log(`[grokbot] server on http://${env.host.includes(':') ? `[${env.host}]` : env.host}:${info.port} (model ${env.xaiModel})`));
+if (!env.allowedEmails.length && !env.openSignup) console.warn('[auth] ALLOWED_EMAILS is not set and SERVER_URL is not localhost: new sign-ups are disabled.');
 if (env.devLoginRequested && !env.devLogin) console.warn('[auth] DEV_LOGIN=1 ignored: dev sign-in only works when HOST is loopback and SERVER_URL is a localhost URL.');
 attachVncRelay(server as unknown as Server);
 // GROKBOT_NO_SCHEDULER=1 for extra dev/test servers sharing a database copy, so routines and triggers don't fire twice.

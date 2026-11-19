@@ -38,6 +38,13 @@ export const env = {
   devLoginRequested: process.env.DEV_LOGIN === '1',
   /** Origins allowed to send state-changing requests and open the screen relay (the web app and this server). */
   trustedOrigins: [...new Set([process.env.APP_URL ?? 'http://localhost:5173', serverUrl].map((u) => { try { return new URL(u).origin; } catch { return ''; } }).filter(Boolean))],
+  /**
+   * Who may create an account: comma-separated emails and/or @domains. Unset means anyone, but only
+   * while SERVER_URL is a localhost URL; a public server with no list accepts no new sign-ups, because
+   * every account spends the owner's xAI, Orgo and Composio credits.
+   */
+  allowedEmails: (process.env.ALLOWED_EMAILS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+  openSignup: isLoopbackUrl(serverUrl),
   /** Mark cookies Secure when the server is reached over HTTPS. */
   secureCookies: serverUrl.startsWith('https://'),
   dbPath: process.env.DB_PATH ?? new URL('../../data/grokbot.db', import.meta.url).pathname,
