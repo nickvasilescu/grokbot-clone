@@ -1,6 +1,7 @@
 import type { IncomingMessage, Server } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { db } from './db.js';
+import { env } from './env.js';
 import { userFromCookieHeader } from './lib/auth.js';
 import { vncAuthResponse } from './lib/des.js';
 import { orgo } from './orgo.js';
@@ -118,6 +119,10 @@ function msgLength(b: Buffer): number {
   }
 }
 
+const sameHost = (origin: string, host: string | undefined) => {
+  try { return !!host && new URL(origin).host === host; } catch { return false; }
+};
+
 export function attachVncRelay(server: Server) {
   const wss = new WebSocketServer({ noServer: true, handleProtocols: (protocols) => (protocols.has('binary') ? 'binary' : false) });
 
@@ -125,6 +130,13 @@ export function attachVncRelay(server: Server) {
     const url = new URL(req.url ?? '/', 'http://x');
     const m = url.pathname.match(/^\/api\/bots\/([^/]+)\/screen$/);
     if (!m) return; // not ours
+    // Browsers always send Origin on WebSocket upgrades; refuse other sites riding the session cookie.
+    const origin = req.headers.origin;
+    if (origin && !env.trustedOrigins.includes(origin) && !sameHost(origin, req.headers.host)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     const user = userFromCookieHeader(req.headers.cookie);
     const bot = user ? (db.prepare('SELECT * FROM bots WHERE id=? AND user_id=?').get(m[1], user.id) as any) : null;
     if (!user || !bot) {

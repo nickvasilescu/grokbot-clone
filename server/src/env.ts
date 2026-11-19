@@ -36,6 +36,8 @@ export const env = {
    */
   devLogin: process.env.DEV_LOGIN === '1' && LOOPBACK_HOSTS.has(host) && isLoopbackUrl(serverUrl),
   devLoginRequested: process.env.DEV_LOGIN === '1',
+  /** Origins allowed to send state-changing requests and open the screen relay (the web app and this server). */
+  trustedOrigins: [...new Set([process.env.APP_URL ?? 'http://localhost:5173', serverUrl].map((u) => { try { return new URL(u).origin; } catch { return ''; } }).filter(Boolean))],
   /** Mark cookies Secure when the server is reached over HTTPS. */
   secureCookies: serverUrl.startsWith('https://'),
   dbPath: process.env.DB_PATH ?? new URL('../../data/grokbot.db', import.meta.url).pathname,

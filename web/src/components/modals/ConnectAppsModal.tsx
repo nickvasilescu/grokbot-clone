@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Toolkit } from '@shared/types';
 import { BotAvatarFor } from '../../avatar/BotAvatar';
-import { api, openPopup, type AppsResponse } from '../../lib/api';
+import { api, isConnectedMessage, openPopup, type AppsResponse } from '../../lib/api';
 import { useStore } from '../../store';
 import { Icon } from '../Icon';
 import { Menu } from '../Menu';
@@ -130,7 +130,7 @@ export function ConnectAppsModal() {
 
   // Refresh after the OAuth popup reports back.
   useEffect(() => {
-    const onMsg = (e: MessageEvent) => { if ((e.data as { type?: string })?.type === 'grokbot-connected') refresh(); };
+    const onMsg = (e: MessageEvent) => { if (isConnectedMessage(e)) refresh(); };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, [refresh]);

@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { csrf } from 'hono/csrf';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Server } from 'node:http';
@@ -25,6 +26,8 @@ initSubagents();
 initRooms();
 
 const app = new Hono();
+// Cookie auth: reject cross-origin form/text POSTs (JSON requests already need a CORS preflight, which we never allow).
+app.use('/api/*', csrf({ origin: env.trustedOrigins }));
 app.get('/api/health', (c) => c.json({ ok: true, model: env.xaiModel }));
 app.route('/api/checkins', checkinsApi);
 app.route('/api/rooms', roomsApi);
